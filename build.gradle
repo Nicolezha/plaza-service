@@ -29,6 +29,7 @@ ext {
 	lombokMapstructBindingVersion = "0.2.0"
 	mySqlConnectorVersion = "9.2.0"
 	openApiVersion = "2.10.0"
+	springCloudVersion = "2025.0.0"
 }
 
 dependencies {
@@ -48,6 +49,13 @@ dependencies {
 	annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
 
 	implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${openApiVersion}"
+	implementation "org.springframework.cloud:spring-cloud-starter-openfeign"
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+	}
 }
 
 tasks.named('test') {
@@ -57,3 +65,36 @@ tasks.named('test') {
 test {
 	finalizedBy jacocoTestReport
 }
+
+def jacocoExcludes = [
+		'**/PowerUpApplication*',
+		'**/application/dto/**',
+		'**/application/mapper/**',
+		'**/infrastructure/configuration/**',
+		'**/infrastructure/documentation/**',
+		'**/infrastructure/out/jpa/entity/**',
+		'**/infrastructure/out/jpa/mapper/**',
+		'**/infrastructure/out/jpa/repository/**'
+]
+
+jacocoTestReport {
+	dependsOn test
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, excludes: jacocoExcludes)
+	}))
+}
+
+jacocoTestCoverageVerification {
+	classDirectories.setFrom(jacocoTestReport.classDirectories)
+	violationRules {
+		rule {
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.80
+			}
+		}
+	}
+}
+
+check.dependsOn jacocoTestCoverageVerification

@@ -4,7 +4,7 @@ import com.pragma.powerup.domain.model.ObjectModel;
 
 import java.util.List;
 
-public interface IObjectServicePort {
+public interface IRestaurantServicePort {
 
     void saveObject(ObjectModel objectModel);
 

@@ -1,13 +1,13 @@
 package com.pragma.powerup.application.handler;
 
-import com.pragma.powerup.application.dto.request.ObjectRequestDto;
+import com.pragma.powerup.application.dto.request.RestaurantRequestDto;
 import com.pragma.powerup.application.dto.response.ObjectResponseDto;
 
 import java.util.List;
 
-public interface IObjectHandler {
+public interface IRestaurantHandler {
 
-    void saveObject(ObjectRequestDto objectRequestDto);
+    void saveRestaurant(RestaurantRequestDto restaurantRequestDto);
 
     List<ObjectResponseDto> getAllObjects();
 }
