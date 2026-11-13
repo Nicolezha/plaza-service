@@ -1,4 +1,4 @@
-package com.pragma.powerup.infrastructure.out.jpa.feign;
+package com.pragma.powerup.infrastructure.out.feign;
 
 import com.pragma.powerup.domain.exception.OwnerNotFoundException;
 import com.pragma.powerup.domain.exception.UserServiceUnavailableException;

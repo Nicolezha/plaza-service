@@ -1,4 +1,4 @@
-package com.pragma.powerup.infrastructure.out.jpa.feign;
+package com.pragma.powerup.infrastructure.out.feign;
 
 import com.pragma.powerup.domain.model.Role;
 import lombok.Getter;

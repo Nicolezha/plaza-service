@@ -1,12 +1,8 @@
 package com.pragma.powerup.domain.api;
 
-import com.pragma.powerup.domain.model.ObjectModel;
-
-import java.util.List;
+import com.pragma.powerup.domain.model.RestaurantModel;
 
 public interface IRestaurantServicePort {
 
-    void saveObject(ObjectModel objectModel);
-
-    List<ObjectModel> getAllObjects();
+    void saveRestaurant(RestaurantModel restaurantModel);
 }
