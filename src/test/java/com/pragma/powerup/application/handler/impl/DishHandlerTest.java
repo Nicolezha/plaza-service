@@ -1,6 +1,7 @@
 package com.pragma.powerup.application.handler.impl;
 
 import com.pragma.powerup.application.dto.request.DishRequestDto;
+import com.pragma.powerup.application.dto.request.DishUpdateRequestDto;
 import com.pragma.powerup.application.mapper.IDishRequestMapper;
 import com.pragma.powerup.domain.api.IDishServicePort;
 import com.pragma.powerup.domain.model.DishModel;
@@ -34,5 +35,16 @@ class DishHandlerTest {
         dishHandler.saveDish(request, 1L);
 
         verify(dishServicePort).saveDish(model, 1L);
+    }
+
+    @Test
+    void updateDishShouldDelegateTheDtoFieldsToThePort() {
+        DishUpdateRequestDto request = new DishUpdateRequestDto();
+        request.setPrice(30000);
+        request.setDescription("Nueva descripcion");
+
+        dishHandler.updateDish(5L, request, 1L);
+
+        verify(dishServicePort).updateDish(5L, 30000, "Nueva descripcion", 1L);
     }
 }

@@ -1,6 +1,7 @@
 package com.pragma.powerup.domain.usecase;
 
 import com.pragma.powerup.domain.exception.CategoryNotFoundException;
+import com.pragma.powerup.domain.exception.DishNotFoundException;
 import com.pragma.powerup.domain.exception.InvalidDishDataException;
 import com.pragma.powerup.domain.exception.NotRestaurantOwnerException;
 import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
@@ -28,6 +29,7 @@ class DishUseCaseTest {
     private static final Long OWNER_ID = 1L;
     private static final Long RESTAURANT_ID = 10L;
     private static final Long CATEGORY_ID = 3L;
+    private static final Long DISH_ID = 5L;
 
     @Mock
     private IDishPersistencePort dishPersistencePort;
@@ -132,6 +134,95 @@ class DishUseCaseTest {
 
         assertEquals(CATEGORY_NOT_FOUND_MESSAGE, ex.getMessage());
         assertNull(dish.getActive());
+        verify(dishPersistencePort, never()).saveDish(any());
+    }
+
+    private DishModel storedDish() {
+        DishModel dish = validDish();
+        dish.setId(DISH_ID);
+        dish.setActive(true);
+        return dish;
+    }
+
+    @Test
+    void updateDishShouldChangeOnlyPriceAndDescriptionAndSave() {
+        DishModel dish = storedDish();
+
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.of(dish));
+        when(restaurantPersistencePort.findById(RESTAURANT_ID))
+                .thenReturn(Optional.of(restaurantOwnedBy(OWNER_ID)));
+
+        dishUseCase.updateDish(DISH_ID, 30000, "Nueva descripcion", OWNER_ID);
+
+        assertEquals(30000, dish.getPrice());
+        assertEquals("Nueva descripcion", dish.getDescription());
+        assertEquals("Bandeja paisa", dish.getName());
+        assertEquals("https://imagenes.com/bandeja.png", dish.getImageUrl());
+        assertEquals(CATEGORY_ID, dish.getCategoryId());
+        assertEquals(RESTAURANT_ID, dish.getRestaurantId());
+        assertTrue(dish.getActive());
+        verify(dishPersistencePort).saveDish(dish);
+    }
+
+    @Test
+    void updateDishShouldValidateTheNewPriceNotTheOldOne() {
+        DishModel dish = storedDish();
+
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.of(dish));
+        when(restaurantPersistencePort.findById(RESTAURANT_ID))
+                .thenReturn(Optional.of(restaurantOwnedBy(OWNER_ID)));
+        doAnswer(invocation -> {
+            DishModel validated = invocation.getArgument(0);
+            assertEquals(-5, validated.getPrice());
+            throw new InvalidDishDataException(PRICE_INVALID_MESSAGE);
+        }).when(dishValidator).validate(dish);
+
+        InvalidDishDataException ex = assertThrows(InvalidDishDataException.class,
+                () -> dishUseCase.updateDish(DISH_ID, -5, "Nueva descripcion", OWNER_ID));
+
+        assertEquals(PRICE_INVALID_MESSAGE, ex.getMessage());
+        verify(dishPersistencePort, never()).saveDish(any());
+    }
+
+    @Test
+    void updateDishShouldThrowWhenDishDoesNotExist() {
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.empty());
+
+        DishNotFoundException ex = assertThrows(DishNotFoundException.class,
+                () -> dishUseCase.updateDish(DISH_ID, 30000, "Nueva descripcion", OWNER_ID));
+
+        assertEquals(DISH_NOT_FOUND_MESSAGE, ex.getMessage());
+        verifyNoInteractions(restaurantPersistencePort);
+        verify(dishPersistencePort, never()).saveDish(any());
+    }
+
+    @Test
+    void updateDishShouldThrowWhenRestaurantDoesNotExist() {
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.of(storedDish()));
+        when(restaurantPersistencePort.findById(RESTAURANT_ID)).thenReturn(Optional.empty());
+
+        RestaurantNotFoundException ex = assertThrows(RestaurantNotFoundException.class,
+                () -> dishUseCase.updateDish(DISH_ID, 30000, "Nueva descripcion", OWNER_ID));
+
+        assertEquals(RESTAURANT_NOT_FOUND_MESSAGE, ex.getMessage());
+        verify(dishPersistencePort, never()).saveDish(any());
+    }
+
+    @Test
+    void updateDishShouldThrowWhenRequesterIsNotTheRestaurantOwner() {
+        DishModel dish = storedDish();
+
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.of(dish));
+        when(restaurantPersistencePort.findById(RESTAURANT_ID))
+                .thenReturn(Optional.of(restaurantOwnedBy(OWNER_ID)));
+
+        NotRestaurantOwnerException ex = assertThrows(NotRestaurantOwnerException.class,
+                () -> dishUseCase.updateDish(DISH_ID, 30000, "Nueva descripcion", 99L));
+
+        assertEquals(NOT_RESTAURANT_OWNER_MESSAGE, ex.getMessage());
+        assertEquals(25000, dish.getPrice());
+        assertEquals("Plato tipico", dish.getDescription());
+        verifyNoInteractions(dishValidator);
         verify(dishPersistencePort, never()).saveDish(any());
     }
 }

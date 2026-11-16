@@ -16,4 +16,7 @@ public class DishConstants {
 
     public static final String CATEGORY_NOT_FOUND_MESSAGE =
             "The category with the given id does not exist";
+
+    public static final String DISH_NOT_FOUND_MESSAGE =
+            "The dish with the given id does not exist";
 }

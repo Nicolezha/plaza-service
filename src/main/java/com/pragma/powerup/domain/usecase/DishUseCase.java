@@ -1,9 +1,7 @@
 package com.pragma.powerup.domain.usecase;
 
 import com.pragma.powerup.domain.api.IDishServicePort;
-import com.pragma.powerup.domain.exception.CategoryNotFoundException;
-import com.pragma.powerup.domain.exception.NotRestaurantOwnerException;
-import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
+import com.pragma.powerup.domain.exception.*;
 import com.pragma.powerup.domain.model.DishModel;
 import com.pragma.powerup.domain.model.RestaurantModel;
 import com.pragma.powerup.domain.spi.ICategoryPersistencePort;
@@ -46,6 +44,27 @@ public class DishUseCase implements IDishServicePort {
         }
 
         dish.setActive(true);
+
+        dishPersistencePort.saveDish(dish);
+    }
+
+    @Override
+    public void updateDish(Long dishId, Integer price, String description, Long requesterId) {
+
+        DishModel dish = dishPersistencePort.findById(dishId)
+                .orElseThrow(() -> new DishNotFoundException(DISH_NOT_FOUND_MESSAGE));
+
+        RestaurantModel restaurant = restaurantPersistencePort.findById(dish.getRestaurantId())
+                .orElseThrow(() -> new RestaurantNotFoundException(RESTAURANT_NOT_FOUND_MESSAGE));
+
+        if(!restaurant.getOwnerId().equals(requesterId)){
+            throw new NotRestaurantOwnerException(NOT_RESTAURANT_OWNER_MESSAGE);
+        }
+
+        dish.setPrice(price);
+        dish.setDescription(description);
+
+        dishValidator.validate(dish);
 
         dishPersistencePort.saveDish(dish);
     }
