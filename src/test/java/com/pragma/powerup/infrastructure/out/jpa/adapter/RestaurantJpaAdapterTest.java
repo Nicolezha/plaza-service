@@ -10,6 +10,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
@@ -48,6 +50,27 @@ class RestaurantJpaAdapterTest {
 
         assertTrue(restaurantJpaAdapter.existsByNit("900123456"));
         assertFalse(restaurantJpaAdapter.existsByNit("111"));
+    }
+
+    @Test
+    void findByIdShouldReturnTheMappedRestaurantWhenItExists(){
+        RestaurantEntity entity = new RestaurantEntity();
+        RestaurantModel model = new RestaurantModel();
+
+        when(restaurantRepository.findById(1L)).thenReturn(Optional.of(entity));
+        when(restaurantEntityMapper.toRestaurantModel(entity)).thenReturn(model);
+
+        Optional<RestaurantModel> result = restaurantJpaAdapter.findById(1L);
+
+        assertTrue(result.isPresent());
+        assertSame(model, result.get());
+    }
+
+    @Test
+    void findByIdShouldReturnEmptyWhenTheRestaurantDoesNotExist(){
+        when(restaurantRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertTrue(restaurantJpaAdapter.findById(99L).isEmpty());
     }
 
 
