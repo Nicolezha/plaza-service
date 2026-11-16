@@ -96,4 +96,10 @@ public class ControllerAdvisor {
         return ResponseEntity.badRequest()
                 .body(Collections.singletonMap(MESSAGE, "Missing required header: " + ex.getHeaderName()));
     }
+
+    @ExceptionHandler(DishNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleDishNotFound(DishNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
 }
