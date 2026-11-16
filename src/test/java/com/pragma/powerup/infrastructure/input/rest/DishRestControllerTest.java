@@ -1,8 +1,10 @@
 package com.pragma.powerup.infrastructure.input.rest;
 
 import com.pragma.powerup.application.dto.request.DishRequestDto;
+import com.pragma.powerup.application.dto.request.DishUpdateRequestDto;
 import com.pragma.powerup.application.handler.IDishHandler;
 import com.pragma.powerup.domain.exception.CategoryNotFoundException;
+import com.pragma.powerup.domain.exception.DishNotFoundException;
 import com.pragma.powerup.domain.exception.InvalidDishDataException;
 import com.pragma.powerup.domain.exception.NotRestaurantOwnerException;
 import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
@@ -22,6 +24,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -141,6 +144,80 @@ class DishRestControllerTest {
 
         mockMvc.perform(post(URL).header(HEADER, 99L)
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(NOT_RESTAURANT_OWNER_MESSAGE));
+    }
+
+    private static final String UPDATE_URL = URL + "/5";
+
+    private static final String VALID_UPDATE_BODY = """
+            {
+              "price": 30000,
+              "description": "Nueva descripcion"
+            }
+            """;
+
+    @Test
+    void updateDishShouldReturn200() throws Exception {
+        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
+                .andExpect(status().isOk());
+
+        verify(dishHandler).updateDish(eq(5L), any(DishUpdateRequestDto.class), eq(1L));
+    }
+
+    @Test
+    void updateDishShouldReturn400WhenPriceIsNotPositive() throws Exception {
+        String body = VALID_UPDATE_BODY.replace("30000", "0");
+
+        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("price")));
+
+        verifyNoInteractions(dishHandler);
+    }
+
+    @Test
+    void updateDishShouldReturn400WhenDescriptionIsBlank() throws Exception {
+        String body = VALID_UPDATE_BODY.replace("\"Nueva descripcion\"", "\"\"");
+
+        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("description")));
+
+        verifyNoInteractions(dishHandler);
+    }
+
+    @Test
+    void updateDishShouldReturn400WhenTheRequesterHeaderIsMissing() throws Exception {
+        mockMvc.perform(patch(UPDATE_URL)
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString(HEADER)));
+
+        verifyNoInteractions(dishHandler);
+    }
+
+    @Test
+    void updateDishShouldReturn404WhenDishNotFound() throws Exception {
+        doThrow(new DishNotFoundException(DISH_NOT_FOUND_MESSAGE))
+                .when(dishHandler).updateDish(any(), any(), any());
+
+        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(DISH_NOT_FOUND_MESSAGE));
+    }
+
+    @Test
+    void updateDishShouldReturn403WhenRequesterIsNotTheOwner() throws Exception {
+        doThrow(new NotRestaurantOwnerException(NOT_RESTAURANT_OWNER_MESSAGE))
+                .when(dishHandler).updateDish(any(), any(), any());
+
+        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 99L)
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(NOT_RESTAURANT_OWNER_MESSAGE));
     }
