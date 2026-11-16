@@ -44,7 +44,7 @@ To get a local copy up and running follow these steps.
       datasource:
           url: jdbc:mysql://localhost/powerup
           username: root
-          password: 1234
+          password: ${DB_PASSWORD}
    ```
 
 <!-- USAGE -->
