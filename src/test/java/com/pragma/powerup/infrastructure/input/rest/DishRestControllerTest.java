@@ -16,8 +16,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.util.List;
 
 import static com.pragma.powerup.domain.util.DishConstants.*;
 import static org.hamcrest.Matchers.containsString;
@@ -33,7 +38,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DishRestControllerTest {
 
     private static final String URL = "/api/v1/dish";
-    private static final String HEADER = "X-Requester-Id";
 
     private static final String VALID_BODY = """
             {
@@ -54,6 +58,13 @@ class DishRestControllerTest {
 
     private MockMvc mockMvc;
 
+    private Authentication authenticatedAs(Long userId) {
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                "owner@gmail.com", null, List.of(new SimpleGrantedAuthority("ROLE_OWNER")));
+        authentication.setDetails(userId);
+        return authentication;
+    }
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(dishRestController)
@@ -63,7 +74,7 @@ class DishRestControllerTest {
 
     @Test
     void saveDishShouldReturn201() throws Exception {
-        mockMvc.perform(post(URL).header(HEADER, 1L)
+        mockMvc.perform(post(URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isCreated());
 
@@ -74,7 +85,7 @@ class DishRestControllerTest {
     void saveDishShouldReturn400WhenARequiredFieldIsBlank() throws Exception {
         String body = VALID_BODY.replace("\"Bandeja paisa\"", "\"\"");
 
-        mockMvc.perform(post(URL).header(HEADER, 1L)
+        mockMvc.perform(post(URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("name")));
@@ -86,20 +97,10 @@ class DishRestControllerTest {
     void saveDishShouldReturn400WhenPriceIsNotPositive() throws Exception {
         String body = VALID_BODY.replace("25000", "0");
 
-        mockMvc.perform(post(URL).header(HEADER, 1L)
+        mockMvc.perform(post(URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("price")));
-
-        verifyNoInteractions(dishHandler);
-    }
-
-    @Test
-    void saveDishShouldReturn400WhenTheRequesterHeaderIsMissing() throws Exception {
-        mockMvc.perform(post(URL)
-                        .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString(HEADER)));
 
         verifyNoInteractions(dishHandler);
     }
@@ -109,7 +110,7 @@ class DishRestControllerTest {
         doThrow(new InvalidDishDataException(PRICE_INVALID_MESSAGE))
                 .when(dishHandler).saveDish(any(), any());
 
-        mockMvc.perform(post(URL).header(HEADER, 1L)
+        mockMvc.perform(post(URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(PRICE_INVALID_MESSAGE));
@@ -120,7 +121,7 @@ class DishRestControllerTest {
         doThrow(new RestaurantNotFoundException(RESTAURANT_NOT_FOUND_MESSAGE))
                 .when(dishHandler).saveDish(any(), any());
 
-        mockMvc.perform(post(URL).header(HEADER, 1L)
+        mockMvc.perform(post(URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value(RESTAURANT_NOT_FOUND_MESSAGE));
@@ -131,7 +132,7 @@ class DishRestControllerTest {
         doThrow(new CategoryNotFoundException(CATEGORY_NOT_FOUND_MESSAGE))
                 .when(dishHandler).saveDish(any(), any());
 
-        mockMvc.perform(post(URL).header(HEADER, 1L)
+        mockMvc.perform(post(URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value(CATEGORY_NOT_FOUND_MESSAGE));
@@ -142,7 +143,7 @@ class DishRestControllerTest {
         doThrow(new NotRestaurantOwnerException(NOT_RESTAURANT_OWNER_MESSAGE))
                 .when(dishHandler).saveDish(any(), any());
 
-        mockMvc.perform(post(URL).header(HEADER, 99L)
+        mockMvc.perform(post(URL).principal(authenticatedAs(99L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(NOT_RESTAURANT_OWNER_MESSAGE));
@@ -159,7 +160,7 @@ class DishRestControllerTest {
 
     @Test
     void updateDishShouldReturn200() throws Exception {
-        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 1L)
+        mockMvc.perform(patch(UPDATE_URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
                 .andExpect(status().isOk());
 
@@ -170,7 +171,7 @@ class DishRestControllerTest {
     void updateDishShouldReturn400WhenPriceIsNotPositive() throws Exception {
         String body = VALID_UPDATE_BODY.replace("30000", "0");
 
-        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 1L)
+        mockMvc.perform(patch(UPDATE_URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("price")));
@@ -182,20 +183,10 @@ class DishRestControllerTest {
     void updateDishShouldReturn400WhenDescriptionIsBlank() throws Exception {
         String body = VALID_UPDATE_BODY.replace("\"Nueva descripcion\"", "\"\"");
 
-        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 1L)
+        mockMvc.perform(patch(UPDATE_URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("description")));
-
-        verifyNoInteractions(dishHandler);
-    }
-
-    @Test
-    void updateDishShouldReturn400WhenTheRequesterHeaderIsMissing() throws Exception {
-        mockMvc.perform(patch(UPDATE_URL)
-                        .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString(HEADER)));
 
         verifyNoInteractions(dishHandler);
     }
@@ -205,7 +196,7 @@ class DishRestControllerTest {
         doThrow(new DishNotFoundException(DISH_NOT_FOUND_MESSAGE))
                 .when(dishHandler).updateDish(any(), any(), any());
 
-        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 1L)
+        mockMvc.perform(patch(UPDATE_URL).principal(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value(DISH_NOT_FOUND_MESSAGE));
@@ -216,7 +207,7 @@ class DishRestControllerTest {
         doThrow(new NotRestaurantOwnerException(NOT_RESTAURANT_OWNER_MESSAGE))
                 .when(dishHandler).updateDish(any(), any(), any());
 
-        mockMvc.perform(patch(UPDATE_URL).header(HEADER, 99L)
+        mockMvc.perform(patch(UPDATE_URL).principal(authenticatedAs(99L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(NOT_RESTAURANT_OWNER_MESSAGE));

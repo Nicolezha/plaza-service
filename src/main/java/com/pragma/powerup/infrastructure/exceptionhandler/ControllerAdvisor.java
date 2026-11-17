@@ -5,7 +5,6 @@ import com.pragma.powerup.infrastructure.exception.NoDataFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -89,12 +88,6 @@ public class ControllerAdvisor {
     public ResponseEntity<Map<String, String>> handleNotRestaurantOwner(NotRestaurantOwnerException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
-    }
-
-    @ExceptionHandler(MissingRequestHeaderException.class)
-    public ResponseEntity<Map<String, String>> handleMissingRequestHeader(MissingRequestHeaderException ex) {
-        return ResponseEntity.badRequest()
-                .body(Collections.singletonMap(MESSAGE, "Missing required header: " + ex.getHeaderName()));
     }
 
     @ExceptionHandler(DishNotFoundException.class)
