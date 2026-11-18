@@ -50,7 +50,26 @@ public class DishUseCase implements IDishServicePort {
 
     @Override
     public void updateDish(Long dishId, Integer price, String description, Long requesterId) {
+        DishModel dish = findDishOwnedBy(dishId, requesterId);
 
+        dish.setPrice(price);
+        dish.setDescription(description);
+
+        dishValidator.validate(dish);
+
+        dishPersistencePort.saveDish(dish);
+    }
+
+    @Override
+    public void updateDishStatus(Long dishId, Boolean active, Long requesterId) {
+        DishModel dish = findDishOwnedBy(dishId, requesterId);
+
+        dish.setActive(active);
+
+        dishPersistencePort.saveDish(dish);
+    }
+
+    private DishModel findDishOwnedBy(Long dishId, Long requesterId) {
         DishModel dish = dishPersistencePort.findById(dishId)
                 .orElseThrow(() -> new DishNotFoundException(DISH_NOT_FOUND_MESSAGE));
 
@@ -61,11 +80,6 @@ public class DishUseCase implements IDishServicePort {
             throw new NotRestaurantOwnerException(NOT_RESTAURANT_OWNER_MESSAGE);
         }
 
-        dish.setPrice(price);
-        dish.setDescription(description);
-
-        dishValidator.validate(dish);
-
-        dishPersistencePort.saveDish(dish);
+        return dish;
     }
 }
