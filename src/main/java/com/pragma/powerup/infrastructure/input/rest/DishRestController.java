@@ -1,6 +1,7 @@
 package com.pragma.powerup.infrastructure.input.rest;
 
 import com.pragma.powerup.application.dto.request.DishRequestDto;
+import com.pragma.powerup.application.dto.request.DishStatusRequestDto;
 import com.pragma.powerup.application.dto.request.DishUpdateRequestDto;
 import com.pragma.powerup.application.handler.IDishHandler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,6 +52,26 @@ public class DishRestController {
         Long requesterId = (Long) authentication.getDetails();
         dishHandler.updateDish(id,
                 dishUpdateRequestDto,
+                requesterId);
+
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @Operation(summary = "Enable or disable a dish")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Dish status updated", content = @Content),
+            @ApiResponse(responseCode = "400", description = "Invalid data", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Requester is not the owner of the restaurant", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Dish not found", content = @Content)
+    })
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Void> updateDishStatus(@PathVariable Long id,
+                                                 @Valid @RequestBody DishStatusRequestDto dishStatusRequestDto,
+                                                 Authentication authentication){
+
+        Long requesterId = (Long) authentication.getDetails();
+        dishHandler.updateDishStatus(id,
+                dishStatusRequestDto,
                 requesterId);
 
         return new ResponseEntity<>(HttpStatus.OK);

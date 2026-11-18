@@ -1,6 +1,7 @@
 package com.pragma.powerup.infrastructure.input.rest;
 
 import com.pragma.powerup.application.dto.request.DishRequestDto;
+import com.pragma.powerup.application.dto.request.DishStatusRequestDto;
 import com.pragma.powerup.application.dto.request.DishUpdateRequestDto;
 import com.pragma.powerup.application.handler.IDishHandler;
 import com.pragma.powerup.domain.exception.CategoryNotFoundException;
@@ -38,6 +39,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DishRestControllerTest {
 
     private static final String URL = "/api/v1/dish";
+
+    private static final String STATUS_URL = "/api/v1/dish/5/status";
+
+    private static final String VALID_STATUS_BODY = "{\"active\": false}";
 
     private static final String VALID_BODY = """
             {
@@ -209,6 +214,47 @@ class DishRestControllerTest {
 
         mockMvc.perform(patch(UPDATE_URL).principal(authenticatedAs(99L))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE_BODY))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(NOT_RESTAURANT_OWNER_MESSAGE));
+    }
+
+    @Test
+    void updateDishStatusShouldReturn200() throws Exception {
+        mockMvc.perform(patch(STATUS_URL).principal(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_STATUS_BODY))
+                .andExpect(status().isOk());
+
+        verify(dishHandler).updateDishStatus(eq(5L), any(DishStatusRequestDto.class), eq(1L));
+    }
+
+    @Test
+    void updateDishStatusShouldReturn400WhenActiveIsMissing() throws Exception {
+        mockMvc.perform(patch(STATUS_URL).principal(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("active")));
+
+        verifyNoInteractions(dishHandler);
+    }
+
+    @Test
+    void updateDishStatusShouldReturn404WhenDishNotFound() throws Exception {
+        doThrow(new DishNotFoundException(DISH_NOT_FOUND_MESSAGE))
+                .when(dishHandler).updateDishStatus(any(), any(), any());
+
+        mockMvc.perform(patch(STATUS_URL).principal(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_STATUS_BODY))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(DISH_NOT_FOUND_MESSAGE));
+    }
+
+    @Test
+    void updateDishStatusShouldReturn403WhenRequesterIsNotTheOwner() throws Exception {
+        doThrow(new NotRestaurantOwnerException(NOT_RESTAURANT_OWNER_MESSAGE))
+                .when(dishHandler).updateDishStatus(any(), any(), any());
+
+        mockMvc.perform(patch(STATUS_URL).principal(authenticatedAs(99L))
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_STATUS_BODY))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(NOT_RESTAURANT_OWNER_MESSAGE));
     }

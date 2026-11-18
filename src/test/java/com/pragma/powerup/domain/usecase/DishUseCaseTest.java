@@ -225,4 +225,75 @@ class DishUseCaseTest {
         verifyNoInteractions(dishValidator);
         verify(dishPersistencePort, never()).saveDish(any());
     }
+
+    @Test
+    void updateDishStatusShouldDisableTheDishAndSave() {
+        DishModel dish = storedDish();
+
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.of(dish));
+        when(restaurantPersistencePort.findById(RESTAURANT_ID))
+                .thenReturn(Optional.of(restaurantOwnedBy(OWNER_ID)));
+
+        dishUseCase.updateDishStatus(DISH_ID, false, OWNER_ID);
+
+        assertFalse(dish.getActive());
+        assertEquals(25000, dish.getPrice());
+        verify(dishPersistencePort).saveDish(dish);
+        verifyNoInteractions(dishValidator);
+    }
+
+    @Test
+    void updateDishStatusShouldEnableTheDishAndSave() {
+        DishModel dish = storedDish();
+        dish.setActive(false);
+
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.of(dish));
+        when(restaurantPersistencePort.findById(RESTAURANT_ID))
+                .thenReturn(Optional.of(restaurantOwnedBy(OWNER_ID)));
+
+        dishUseCase.updateDishStatus(DISH_ID, true, OWNER_ID);
+
+        assertTrue(dish.getActive());
+        verify(dishPersistencePort).saveDish(dish);
+    }
+
+    @Test
+    void updateDishStatusShouldThrowWhenDishDoesNotExist() {
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.empty());
+
+        DishNotFoundException ex = assertThrows(DishNotFoundException.class,
+                () -> dishUseCase.updateDishStatus(DISH_ID, false, OWNER_ID));
+
+        assertEquals(DISH_NOT_FOUND_MESSAGE, ex.getMessage());
+        verifyNoInteractions(restaurantPersistencePort);
+        verify(dishPersistencePort, never()).saveDish(any());
+    }
+
+    @Test
+    void updateDishStatusShouldThrowWhenRestaurantDoesNotExist() {
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.of(storedDish()));
+        when(restaurantPersistencePort.findById(RESTAURANT_ID)).thenReturn(Optional.empty());
+
+        RestaurantNotFoundException ex = assertThrows(RestaurantNotFoundException.class,
+                () -> dishUseCase.updateDishStatus(DISH_ID, false, OWNER_ID));
+
+        assertEquals(RESTAURANT_NOT_FOUND_MESSAGE, ex.getMessage());
+        verify(dishPersistencePort, never()).saveDish(any());
+    }
+
+    @Test
+    void updateDishStatusShouldThrowWhenRequesterIsNotTheRestaurantOwner() {
+        DishModel dish = storedDish();
+
+        when(dishPersistencePort.findById(DISH_ID)).thenReturn(Optional.of(dish));
+        when(restaurantPersistencePort.findById(RESTAURANT_ID))
+                .thenReturn(Optional.of(restaurantOwnedBy(OWNER_ID)));
+
+        NotRestaurantOwnerException ex = assertThrows(NotRestaurantOwnerException.class,
+                () -> dishUseCase.updateDishStatus(DISH_ID, false, 99L));
+
+        assertEquals(NOT_RESTAURANT_OWNER_MESSAGE, ex.getMessage());
+        assertTrue(dish.getActive());
+        verify(dishPersistencePort, never()).saveDish(any());
+    }
 }
