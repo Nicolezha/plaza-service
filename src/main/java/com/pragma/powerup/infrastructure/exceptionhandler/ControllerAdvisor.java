@@ -95,4 +95,10 @@ public class ControllerAdvisor {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
     }
+
+    @ExceptionHandler(InvalidPaginationException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidPagination(InvalidPaginationException ex) {
+        return ResponseEntity.badRequest()
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
 }
