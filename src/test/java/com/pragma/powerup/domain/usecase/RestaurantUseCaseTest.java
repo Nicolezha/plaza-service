@@ -1,12 +1,15 @@
 package com.pragma.powerup.domain.usecase;
 
+import com.pragma.powerup.domain.exception.InvalidPaginationException;
 import com.pragma.powerup.domain.exception.OwnerNotFoundException;
 import com.pragma.powerup.domain.exception.RestaurantAlreadyExistsException;
 import com.pragma.powerup.domain.exception.UserNotOwnerException;
+import com.pragma.powerup.domain.model.PageModel;
 import com.pragma.powerup.domain.model.RestaurantModel;
 import com.pragma.powerup.domain.model.Role;
 import com.pragma.powerup.domain.spi.IRestaurantPersistencePort;
 import com.pragma.powerup.domain.spi.IUserClientPort;
+import com.pragma.powerup.domain.validation.PaginationValidator;
 import com.pragma.powerup.domain.validation.RestaurantValidator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +17,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
+import static com.pragma.powerup.domain.util.PaginationConstants.PAGE_INVALID_MESSAGE;
 import static com.pragma.powerup.domain.util.RestaurantConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -29,6 +35,9 @@ class RestaurantUseCaseTest {
 
     @Mock
     private IUserClientPort userClientPort;
+
+    @Mock
+    private PaginationValidator paginationValidator;
 
     @InjectMocks
     RestaurantUseCase restaurantUseCase;
@@ -98,5 +107,31 @@ class RestaurantUseCaseTest {
         verify(restaurantPersistencePort, never()).existsByNit(any());
         verify(restaurantPersistencePort, never()).saveRestaurant(any());
 
+    }
+
+    @Test
+    void getRestaurantsShouldValidateAndReturnThePageFromThePersistencePort() {
+        PageModel<RestaurantModel> page =
+                new PageModel<>(List.of(validRestaurant()), 0, 10, 1L, 1);
+
+        when(restaurantPersistencePort.findAllOrderedByName(0, 10)).thenReturn(page);
+
+        PageModel<RestaurantModel> result = restaurantUseCase.getRestaurants(0, 10);
+
+        assertSame(page, result);
+        verify(paginationValidator).validatePagination(0, 10);
+        verify(restaurantPersistencePort).findAllOrderedByName(0, 10);
+    }
+
+    @Test
+    void getRestaurantsShouldThrowAndNotQueryWhenPaginationIsInvalid() {
+        doThrow(new InvalidPaginationException(PAGE_INVALID_MESSAGE))
+                .when(paginationValidator).validatePagination(-1, 10);
+
+        InvalidPaginationException ex = assertThrows(InvalidPaginationException.class,
+                () -> restaurantUseCase.getRestaurants(-1, 10));
+
+        assertEquals(PAGE_INVALID_MESSAGE, ex.getMessage());
+        verify(restaurantPersistencePort, never()).findAllOrderedByName(anyInt(), anyInt());
     }
 }

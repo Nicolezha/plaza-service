@@ -1,7 +1,11 @@
 package com.pragma.powerup.infrastructure.input.rest;
 
+import com.pragma.powerup.application.dto.request.PageRequestDto;
 import com.pragma.powerup.application.dto.request.RestaurantRequestDto;
+import com.pragma.powerup.application.dto.response.PageResponseDto;
+import com.pragma.powerup.application.dto.response.RestaurantListResponseDto;
 import com.pragma.powerup.application.handler.IRestaurantHandler;
+import com.pragma.powerup.domain.exception.InvalidPaginationException;
 import com.pragma.powerup.domain.exception.OwnerNotFoundException;
 import com.pragma.powerup.domain.exception.RestaurantAlreadyExistsException;
 import com.pragma.powerup.domain.exception.UserNotOwnerException;
@@ -10,6 +14,7 @@ import com.pragma.powerup.infrastructure.exceptionhandler.ControllerAdvisor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -17,9 +22,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
+
+import static com.pragma.powerup.domain.util.PaginationConstants.SIZE_INVALID_MESSAGE;
 import static com.pragma.powerup.domain.util.RestaurantConstants.*;
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -123,5 +133,55 @@ class RestaurantRestControllerTest {
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.message").value(USER_SERVICE_UNAVAILABLE_MESSAGE));
+    }
+
+    @Test
+    void getRestaurantsShouldReturn200WithPaginatedNameAndLogoOnly() throws Exception {
+        RestaurantListResponseDto dto = new RestaurantListResponseDto();
+        dto.setName("El Corral 24");
+        dto.setLogoUrl("https://logos.com/corral.png");
+        PageResponseDto<RestaurantListResponseDto> response =
+                new PageResponseDto<>(List.of(dto), 1, 2, 3L, 2);
+
+        when(restaurantHandler.getRestaurants(any(PageRequestDto.class))).thenReturn(response);
+
+        mockMvc.perform(get(URL).param("page", "1").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].name").value("El Corral 24"))
+                .andExpect(jsonPath("$.content[0].logoUrl").value("https://logos.com/corral.png"))
+                .andExpect(jsonPath("$.content[0].nit").doesNotExist())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        ArgumentCaptor<PageRequestDto> captor = ArgumentCaptor.forClass(PageRequestDto.class);
+        verify(restaurantHandler).getRestaurants(captor.capture());
+        assertEquals(1, captor.getValue().getPage());
+        assertEquals(2, captor.getValue().getSize());
+    }
+
+    @Test
+    void getRestaurantsShouldUseDefaultPaginationWhenParamsAreMissing() throws Exception {
+        when(restaurantHandler.getRestaurants(any(PageRequestDto.class)))
+                .thenReturn(new PageResponseDto<>(List.of(), 0, 10, 0L, 0));
+
+        mockMvc.perform(get(URL))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<PageRequestDto> captor = ArgumentCaptor.forClass(PageRequestDto.class);
+        verify(restaurantHandler).getRestaurants(captor.capture());
+        assertEquals(0, captor.getValue().getPage());
+        assertEquals(10, captor.getValue().getSize());
+    }
+
+    @Test
+    void getRestaurantsShouldReturn400WhenPaginationIsInvalid() throws Exception {
+        when(restaurantHandler.getRestaurants(any(PageRequestDto.class)))
+                .thenThrow(new InvalidPaginationException(SIZE_INVALID_MESSAGE));
+
+        mockMvc.perform(get(URL).param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(SIZE_INVALID_MESSAGE));
     }
 }
