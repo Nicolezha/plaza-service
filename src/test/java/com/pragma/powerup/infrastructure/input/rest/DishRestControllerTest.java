@@ -3,16 +3,21 @@ package com.pragma.powerup.infrastructure.input.rest;
 import com.pragma.powerup.application.dto.request.DishRequestDto;
 import com.pragma.powerup.application.dto.request.DishStatusRequestDto;
 import com.pragma.powerup.application.dto.request.DishUpdateRequestDto;
+import com.pragma.powerup.application.dto.request.PageRequestDto;
+import com.pragma.powerup.application.dto.response.DishListResponseDto;
+import com.pragma.powerup.application.dto.response.PageResponseDto;
 import com.pragma.powerup.application.handler.IDishHandler;
 import com.pragma.powerup.domain.exception.CategoryNotFoundException;
 import com.pragma.powerup.domain.exception.DishNotFoundException;
 import com.pragma.powerup.domain.exception.InvalidDishDataException;
+import com.pragma.powerup.domain.exception.InvalidPaginationException;
 import com.pragma.powerup.domain.exception.NotRestaurantOwnerException;
 import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
 import com.pragma.powerup.infrastructure.exceptionhandler.ControllerAdvisor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,10 +31,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 
 import static com.pragma.powerup.domain.util.DishConstants.*;
+import static com.pragma.powerup.domain.util.PaginationConstants.SIZE_INVALID_MESSAGE;
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -257,5 +266,89 @@ class DishRestControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_STATUS_BODY))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(NOT_RESTAURANT_OWNER_MESSAGE));
+    }
+
+    private DishListResponseDto dishListResponse() {
+        DishListResponseDto dto = new DishListResponseDto();
+        dto.setId(5L);
+        dto.setName("Bandeja paisa");
+        dto.setPrice(25000);
+        dto.setDescription("Plato tipico");
+        dto.setImageUrl("https://imagenes.com/bandeja.png");
+        dto.setCategoryId(3L);
+        return dto;
+    }
+
+    @Test
+    void getDishesByRestaurantShouldReturn200WithPaginatedDishes() throws Exception {
+        PageResponseDto<DishListResponseDto> response =
+                new PageResponseDto<>(List.of(dishListResponse()), 1, 2, 3L, 2);
+
+        when(dishHandler.getDishesByRestaurant(eq(10L), eq(3L), any(PageRequestDto.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(get(URL).param("restaurantId", "10").param("categoryId", "3")
+                        .param("page", "1").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(5))
+                .andExpect(jsonPath("$.content[0].name").value("Bandeja paisa"))
+                .andExpect(jsonPath("$.content[0].price").value(25000))
+                .andExpect(jsonPath("$.content[0].description").value("Plato tipico"))
+                .andExpect(jsonPath("$.content[0].imageUrl").value("https://imagenes.com/bandeja.png"))
+                .andExpect(jsonPath("$.content[0].categoryId").value(3))
+                .andExpect(jsonPath("$.content[0].active").doesNotExist())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        ArgumentCaptor<PageRequestDto> captor = ArgumentCaptor.forClass(PageRequestDto.class);
+        verify(dishHandler).getDishesByRestaurant(eq(10L), eq(3L), captor.capture());
+        assertEquals(1, captor.getValue().getPage());
+        assertEquals(2, captor.getValue().getSize());
+    }
+
+    @Test
+    void getDishesByRestaurantShouldSendNullCategoryAndDefaultPaginationWhenParamsAreMissing() throws Exception {
+        when(dishHandler.getDishesByRestaurant(eq(10L), any(), any(PageRequestDto.class)))
+                .thenReturn(new PageResponseDto<>(List.of(), 0, 10, 0L, 0));
+
+        mockMvc.perform(get(URL).param("restaurantId", "10"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Long> categoryCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<PageRequestDto> pageCaptor = ArgumentCaptor.forClass(PageRequestDto.class);
+        verify(dishHandler).getDishesByRestaurant(eq(10L), categoryCaptor.capture(), pageCaptor.capture());
+        assertNull(categoryCaptor.getValue());
+        assertEquals(0, pageCaptor.getValue().getPage());
+        assertEquals(10, pageCaptor.getValue().getSize());
+    }
+
+    @Test
+    void getDishesByRestaurantShouldReturn400WhenRestaurantIdIsMissing() throws Exception {
+        mockMvc.perform(get(URL))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(dishHandler);
+    }
+
+    @Test
+    void getDishesByRestaurantShouldReturn404WhenRestaurantNotFound() throws Exception {
+        when(dishHandler.getDishesByRestaurant(any(), any(), any()))
+                .thenThrow(new RestaurantNotFoundException(RESTAURANT_NOT_FOUND_MESSAGE));
+
+        mockMvc.perform(get(URL).param("restaurantId", "99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(RESTAURANT_NOT_FOUND_MESSAGE));
+    }
+
+    @Test
+    void getDishesByRestaurantShouldReturn400WhenPaginationIsInvalid() throws Exception {
+        when(dishHandler.getDishesByRestaurant(any(), any(), any()))
+                .thenThrow(new InvalidPaginationException(SIZE_INVALID_MESSAGE));
+
+        mockMvc.perform(get(URL).param("restaurantId", "10").param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(SIZE_INVALID_MESSAGE));
     }
 }

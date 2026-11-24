@@ -3,23 +3,28 @@ package com.pragma.powerup.domain.usecase;
 import com.pragma.powerup.domain.exception.CategoryNotFoundException;
 import com.pragma.powerup.domain.exception.DishNotFoundException;
 import com.pragma.powerup.domain.exception.InvalidDishDataException;
+import com.pragma.powerup.domain.exception.InvalidPaginationException;
 import com.pragma.powerup.domain.exception.NotRestaurantOwnerException;
 import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
 import com.pragma.powerup.domain.model.DishModel;
+import com.pragma.powerup.domain.model.PageModel;
 import com.pragma.powerup.domain.model.RestaurantModel;
 import com.pragma.powerup.domain.spi.ICategoryPersistencePort;
 import com.pragma.powerup.domain.spi.IDishPersistencePort;
 import com.pragma.powerup.domain.spi.IRestaurantPersistencePort;
 import com.pragma.powerup.domain.validation.DishValidator;
+import com.pragma.powerup.domain.validation.PaginationValidator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static com.pragma.powerup.domain.util.DishConstants.*;
+import static com.pragma.powerup.domain.util.PaginationConstants.PAGE_INVALID_MESSAGE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -42,6 +47,9 @@ class DishUseCaseTest {
 
     @Mock
     private IRestaurantPersistencePort restaurantPersistencePort;
+
+    @Mock
+    private PaginationValidator paginationValidator;
 
     @InjectMocks
     private DishUseCase dishUseCase;
@@ -295,5 +303,58 @@ class DishUseCaseTest {
         assertEquals(NOT_RESTAURANT_OWNER_MESSAGE, ex.getMessage());
         assertTrue(dish.getActive());
         verify(dishPersistencePort, never()).saveDish(any());
+    }
+
+    @Test
+    void getDishesByRestaurantShouldReturnThePageWithoutCategoryFilter() {
+        PageModel<DishModel> page = new PageModel<>(List.of(validDish()), 0, 10, 1L, 1);
+
+        when(restaurantPersistencePort.findById(RESTAURANT_ID))
+                .thenReturn(Optional.of(restaurantOwnedBy(OWNER_ID)));
+        when(dishPersistencePort.findByRestaurant(RESTAURANT_ID, null, 0, 10)).thenReturn(page);
+
+        PageModel<DishModel> result = dishUseCase.getDishesByRestaurant(RESTAURANT_ID, null, 0, 10);
+
+        assertSame(page, result);
+        verify(paginationValidator).validatePagination(0, 10);
+        verifyNoInteractions(categoryPersistencePort);
+    }
+
+    @Test
+    void getDishesByRestaurantShouldPassTheCategoryFilterToThePersistencePort() {
+        PageModel<DishModel> page = new PageModel<>(List.of(validDish()), 0, 10, 1L, 1);
+
+        when(restaurantPersistencePort.findById(RESTAURANT_ID))
+                .thenReturn(Optional.of(restaurantOwnedBy(OWNER_ID)));
+        when(dishPersistencePort.findByRestaurant(RESTAURANT_ID, CATEGORY_ID, 0, 10)).thenReturn(page);
+
+        PageModel<DishModel> result = dishUseCase.getDishesByRestaurant(RESTAURANT_ID, CATEGORY_ID, 0, 10);
+
+        assertSame(page, result);
+        verify(dishPersistencePort).findByRestaurant(RESTAURANT_ID, CATEGORY_ID, 0, 10);
+    }
+
+    @Test
+    void getDishesByRestaurantShouldThrowWhenRestaurantDoesNotExist() {
+        when(restaurantPersistencePort.findById(RESTAURANT_ID)).thenReturn(Optional.empty());
+
+        RestaurantNotFoundException ex = assertThrows(RestaurantNotFoundException.class,
+                () -> dishUseCase.getDishesByRestaurant(RESTAURANT_ID, null, 0, 10));
+
+        assertEquals(RESTAURANT_NOT_FOUND_MESSAGE, ex.getMessage());
+        verify(dishPersistencePort, never()).findByRestaurant(any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getDishesByRestaurantShouldThrowAndNotQueryWhenPaginationIsInvalid() {
+        doThrow(new InvalidPaginationException(PAGE_INVALID_MESSAGE))
+                .when(paginationValidator).validatePagination(-1, 10);
+
+        InvalidPaginationException ex = assertThrows(InvalidPaginationException.class,
+                () -> dishUseCase.getDishesByRestaurant(RESTAURANT_ID, null, -1, 10));
+
+        assertEquals(PAGE_INVALID_MESSAGE, ex.getMessage());
+        verifyNoInteractions(restaurantPersistencePort);
+        verify(dishPersistencePort, never()).findByRestaurant(any(), any(), anyInt(), anyInt());
     }
 }
