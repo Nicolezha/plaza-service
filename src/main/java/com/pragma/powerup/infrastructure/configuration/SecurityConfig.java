@@ -33,6 +33,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/dish").hasRole("OWNER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/dish/**").hasRole("OWNER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/dish").hasRole("CLIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/order").hasRole("CLIENT")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))

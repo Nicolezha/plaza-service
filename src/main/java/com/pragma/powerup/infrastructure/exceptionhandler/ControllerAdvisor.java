@@ -101,4 +101,16 @@ public class ControllerAdvisor {
         return ResponseEntity.badRequest()
                 .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
     }
+
+    @ExceptionHandler(InvalidOrderDataException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidOrderData(InvalidOrderDataException ex) {
+        return ResponseEntity.badRequest()
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
+
+    @ExceptionHandler(OrderInProgressException.class)
+    public ResponseEntity<Map<String, String>> handleOrderInProgress(OrderInProgressException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
 }
