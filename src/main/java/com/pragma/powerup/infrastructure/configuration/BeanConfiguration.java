@@ -9,6 +9,7 @@ import com.pragma.powerup.domain.spi.IUserClientPort;
 import com.pragma.powerup.domain.usecase.DishUseCase;
 import com.pragma.powerup.domain.usecase.RestaurantUseCase;
 import com.pragma.powerup.domain.validation.DishValidator;
+import com.pragma.powerup.domain.validation.PaginationValidator;
 import com.pragma.powerup.domain.validation.RestaurantValidator;
 import com.pragma.powerup.infrastructure.out.jpa.adapter.CategoryJpaAdapter;
 import com.pragma.powerup.infrastructure.out.jpa.adapter.DishJpaAdapter;
@@ -44,7 +45,13 @@ public class BeanConfiguration {
 
     @Bean
     public IRestaurantServicePort restaurantServicePort() {
-        return new RestaurantUseCase(restaurantPersistencePort(), restaurantValidator(), userClientPort());
+        return new RestaurantUseCase(restaurantPersistencePort(), restaurantValidator(),
+                userClientPort(), paginationValidator());
+    }
+
+    @Bean
+    public PaginationValidator paginationValidator(){
+        return new PaginationValidator();
     }
 
     @Bean
@@ -77,4 +84,5 @@ public class BeanConfiguration {
     public DishValidator dishValidator(){
         return new DishValidator();
     }
+
 }

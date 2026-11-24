@@ -3,10 +3,12 @@ package com.pragma.powerup.domain.usecase;
 import com.pragma.powerup.domain.api.IRestaurantServicePort;
 import com.pragma.powerup.domain.exception.RestaurantAlreadyExistsException;
 import com.pragma.powerup.domain.exception.UserNotOwnerException;
+import com.pragma.powerup.domain.model.PageModel;
 import com.pragma.powerup.domain.model.RestaurantModel;
 import com.pragma.powerup.domain.model.Role;
 import com.pragma.powerup.domain.spi.IRestaurantPersistencePort;
 import com.pragma.powerup.domain.spi.IUserClientPort;
+import com.pragma.powerup.domain.validation.PaginationValidator;
 import com.pragma.powerup.domain.validation.RestaurantValidator;
 
 
@@ -18,13 +20,21 @@ public class RestaurantUseCase implements IRestaurantServicePort {
     private final IRestaurantPersistencePort restaurantPersistencePort;
     private final IUserClientPort userClientPort;
     private final RestaurantValidator restaurantValidator;
+    private final PaginationValidator paginationValidator;
 
     public RestaurantUseCase(IRestaurantPersistencePort restaurantPersistencePort,
                              RestaurantValidator restaurantValidator,
-                             IUserClientPort userClientPort) {
+                             IUserClientPort userClientPort, PaginationValidator paginationValidator) {
         this.restaurantPersistencePort = restaurantPersistencePort;
         this.restaurantValidator = restaurantValidator;
         this.userClientPort = userClientPort;
+        this.paginationValidator = paginationValidator;
+    }
+
+    @Override
+    public PageModel<RestaurantModel> getRestaurants(int page, int size) {
+        paginationValidator.validatePagination(page, size);
+        return restaurantPersistencePort.findAllOrderedByName(page, size);
     }
 
     @Override

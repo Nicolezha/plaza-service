@@ -4,7 +4,6 @@ import com.pragma.powerup.domain.exception.InvalidRestaurantDataException;
 import com.pragma.powerup.domain.model.RestaurantModel;
 
 import java.util.regex.Pattern;
-
 import static com.pragma.powerup.domain.util.RestaurantConstants.*;
 
 public class RestaurantValidator {
