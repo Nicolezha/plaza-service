@@ -3,6 +3,9 @@ package com.pragma.powerup.infrastructure.input.rest;
 import com.pragma.powerup.application.dto.request.DishRequestDto;
 import com.pragma.powerup.application.dto.request.DishStatusRequestDto;
 import com.pragma.powerup.application.dto.request.DishUpdateRequestDto;
+import com.pragma.powerup.application.dto.request.PageRequestDto;
+import com.pragma.powerup.application.dto.response.DishListResponseDto;
+import com.pragma.powerup.application.dto.response.PageResponseDto;
 import com.pragma.powerup.application.handler.IDishHandler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -76,4 +80,21 @@ public class DishRestController {
 
         return new ResponseEntity<>(HttpStatus.OK);
     }
+
+    @Operation(summary = "List active dishes of a restaurant, paginated and filterable by category")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Dishes page returned"),
+            @ApiResponse(responseCode = "400", description = "Invalid page or size", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Only clients can list dishes", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Restaurant not found", content = @Content)
+    })
+    @GetMapping
+    public ResponseEntity<PageResponseDto<DishListResponseDto>> getDishesByRestaurant(
+            @RequestParam Long restaurantId,
+            @RequestParam(required = false) Long categoryId,
+            @ParameterObject PageRequestDto pageRequest) {
+
+        return ResponseEntity.ok(dishHandler.getDishesByRestaurant(restaurantId, categoryId, pageRequest));
+    }
+
 }
