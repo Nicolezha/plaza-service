@@ -1,5 +1,6 @@
 package com.pragma.powerup.application.handler.impl;
 
+import com.pragma.powerup.application.dto.request.EmployeeAssignmentRequestDto;
 import com.pragma.powerup.application.dto.request.PageRequestDto;
 import com.pragma.powerup.application.dto.request.RestaurantRequestDto;
 import com.pragma.powerup.application.dto.response.PageResponseDto;
@@ -71,5 +72,15 @@ class RestaurantHandlerTest {
         assertEquals(2, result.getSize());
         assertEquals(3L, result.getTotalElements());
         assertEquals(2, result.getTotalPages());
+    }
+
+    @Test
+    void assignEmployeeShouldDelegateWithRestaurantEmployeeAndRequester() {
+        EmployeeAssignmentRequestDto request = new EmployeeAssignmentRequestDto();
+        request.setEmployeeId(30L);
+
+        restaurantHandler.assignEmployee(10L, request, 1L);
+
+        verify(restaurantServicePort).assignEmployee(10L, 30L, 1L);
     }
 }

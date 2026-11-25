@@ -1,6 +1,8 @@
 package com.pragma.powerup.domain.usecase;
 
 import com.pragma.powerup.domain.exception.DishNotFoundException;
+import com.pragma.powerup.domain.exception.EmployeeNotAssignedException;
+import com.pragma.powerup.domain.exception.InvalidPaginationException;
 import com.pragma.powerup.domain.exception.InvalidOrderDataException;
 import com.pragma.powerup.domain.exception.OrderInProgressException;
 import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
@@ -8,11 +10,14 @@ import com.pragma.powerup.domain.model.DishModel;
 import com.pragma.powerup.domain.model.OrderDishModel;
 import com.pragma.powerup.domain.model.OrderModel;
 import com.pragma.powerup.domain.model.OrderStatus;
+import com.pragma.powerup.domain.model.PageModel;
 import com.pragma.powerup.domain.model.RestaurantModel;
 import com.pragma.powerup.domain.spi.IDishPersistencePort;
+import com.pragma.powerup.domain.spi.IEmployeeRestaurantPersistencePort;
 import com.pragma.powerup.domain.spi.IOrderPersistencePort;
 import com.pragma.powerup.domain.spi.IRestaurantPersistencePort;
 import com.pragma.powerup.domain.validation.OrderValidator;
+import com.pragma.powerup.domain.validation.PaginationValidator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +30,8 @@ import java.util.Optional;
 
 import static com.pragma.powerup.domain.util.DishConstants.DISH_NOT_FOUND_MESSAGE;
 import static com.pragma.powerup.domain.util.DishConstants.RESTAURANT_NOT_FOUND_MESSAGE;
+import static com.pragma.powerup.domain.util.EmployeeConstants.EMPLOYEE_NOT_ASSIGNED_MESSAGE;
+import static com.pragma.powerup.domain.util.PaginationConstants.SIZE_INVALID_MESSAGE;
 import static com.pragma.powerup.domain.util.OrderConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -37,6 +44,7 @@ class OrderUseCaseTest {
     private static final Long OTHER_RESTAURANT_ID = 20L;
     private static final Long DISH_ID = 5L;
     private static final Long SECOND_DISH_ID = 6L;
+    private static final Long EMPLOYEE_ID = 30L;
 
     @Mock
     private IOrderPersistencePort orderPersistencePort;
@@ -48,7 +56,13 @@ class OrderUseCaseTest {
     private IDishPersistencePort dishPersistencePort;
 
     @Mock
+    private IEmployeeRestaurantPersistencePort employeeRestaurantPersistencePort;
+
+    @Mock
     private OrderValidator orderValidator;
+
+    @Mock
+    private PaginationValidator paginationValidator;
 
     @InjectMocks
     private OrderUseCase orderUseCase;
@@ -193,5 +207,52 @@ class OrderUseCaseTest {
     void inProgressStatusesShouldBePendingInPreparationAndReady() {
         assertEquals(List.of(OrderStatus.PENDING, OrderStatus.IN_PREPARATION, OrderStatus.READY),
                 OrderStatus.inProgress());
+    }
+
+    @Test
+    void getOrdersByStatusShouldReturnOrdersOfTheEmployeeRestaurant() {
+        PageModel<OrderModel> page = new PageModel<>(List.of(new OrderModel()), 0, 10, 1, 1);
+        when(employeeRestaurantPersistencePort.findRestaurantIdByEmployeeId(EMPLOYEE_ID))
+                .thenReturn(Optional.of(RESTAURANT_ID));
+        when(orderPersistencePort.findByRestaurantIdAndStatus(RESTAURANT_ID, OrderStatus.PENDING, 0, 10))
+                .thenReturn(page);
+
+        PageModel<OrderModel> result = orderUseCase.getOrdersByStatus(OrderStatus.PENDING, EMPLOYEE_ID, 0, 10);
+
+        assertSame(page, result);
+        verify(paginationValidator).validatePagination(0, 10);
+    }
+
+    @Test
+    void getOrdersByStatusShouldThrowWhenPaginationIsInvalid() {
+        doThrow(new InvalidPaginationException(SIZE_INVALID_MESSAGE))
+                .when(paginationValidator).validatePagination(0, 0);
+
+        InvalidPaginationException ex = assertThrows(InvalidPaginationException.class,
+                () -> orderUseCase.getOrdersByStatus(OrderStatus.PENDING, EMPLOYEE_ID, 0, 0));
+
+        assertEquals(SIZE_INVALID_MESSAGE, ex.getMessage());
+        verifyNoInteractions(employeeRestaurantPersistencePort, orderPersistencePort);
+    }
+
+    @Test
+    void getOrdersByStatusShouldThrowWhenStatusIsNull() {
+        InvalidOrderDataException ex = assertThrows(InvalidOrderDataException.class,
+                () -> orderUseCase.getOrdersByStatus(null, EMPLOYEE_ID, 0, 10));
+
+        assertEquals(STATUS_REQUIRED_MESSAGE, ex.getMessage());
+        verifyNoInteractions(employeeRestaurantPersistencePort, orderPersistencePort);
+    }
+
+    @Test
+    void getOrdersByStatusShouldThrowWhenEmployeeIsNotAssignedToARestaurant() {
+        when(employeeRestaurantPersistencePort.findRestaurantIdByEmployeeId(EMPLOYEE_ID))
+                .thenReturn(Optional.empty());
+
+        EmployeeNotAssignedException ex = assertThrows(EmployeeNotAssignedException.class,
+                () -> orderUseCase.getOrdersByStatus(OrderStatus.PENDING, EMPLOYEE_ID, 0, 10));
+
+        assertEquals(EMPLOYEE_NOT_ASSIGNED_MESSAGE, ex.getMessage());
+        verifyNoInteractions(orderPersistencePort);
     }
 }

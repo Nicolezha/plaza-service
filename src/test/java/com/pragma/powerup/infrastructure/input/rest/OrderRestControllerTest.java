@@ -1,11 +1,18 @@
 package com.pragma.powerup.infrastructure.input.rest;
 
 import com.pragma.powerup.application.dto.request.OrderRequestDto;
+import com.pragma.powerup.application.dto.request.PageRequestDto;
+import com.pragma.powerup.application.dto.response.OrderDishResponseDto;
+import com.pragma.powerup.application.dto.response.OrderResponseDto;
+import com.pragma.powerup.application.dto.response.PageResponseDto;
 import com.pragma.powerup.application.handler.IOrderHandler;
 import com.pragma.powerup.domain.exception.DishNotFoundException;
+import com.pragma.powerup.domain.exception.EmployeeNotAssignedException;
+import com.pragma.powerup.domain.exception.InvalidPaginationException;
 import com.pragma.powerup.domain.exception.InvalidOrderDataException;
 import com.pragma.powerup.domain.exception.OrderInProgressException;
 import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
+import com.pragma.powerup.domain.model.OrderStatus;
 import com.pragma.powerup.infrastructure.exceptionhandler.ControllerAdvisor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,10 +28,13 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.pragma.powerup.domain.util.DishConstants.DISH_NOT_FOUND_MESSAGE;
 import static com.pragma.powerup.domain.util.DishConstants.RESTAURANT_NOT_FOUND_MESSAGE;
+import static com.pragma.powerup.domain.util.EmployeeConstants.EMPLOYEE_NOT_ASSIGNED_MESSAGE;
+import static com.pragma.powerup.domain.util.PaginationConstants.SIZE_INVALID_MESSAGE;
 import static com.pragma.powerup.domain.util.OrderConstants.DISH_NOT_FROM_RESTAURANT_MESSAGE;
 import static com.pragma.powerup.domain.util.OrderConstants.ORDER_IN_PROGRESS_MESSAGE;
 import static org.hamcrest.Matchers.containsString;
@@ -32,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -166,5 +177,80 @@ class OrderRestControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(ORDER_IN_PROGRESS_MESSAGE));
+    }
+
+    private OrderResponseDto pendingOrderResponse() {
+        OrderDishResponseDto dish = new OrderDishResponseDto();
+        dish.setDishId(5L);
+        dish.setQuantity(2);
+
+        OrderResponseDto order = new OrderResponseDto();
+        order.setId(1L);
+        order.setClientId(7L);
+        order.setRestaurantId(10L);
+        order.setDate(LocalDateTime.of(2026, 11, 24, 12, 0));
+        order.setStatus(OrderStatus.PENDING);
+        order.setDishes(List.of(dish));
+        return order;
+    }
+
+    @Test
+    void getOrdersByStatusShouldReturn200WithThePageAndPassStatusEmployeeAndPagination() throws Exception {
+        when(orderHandler.getOrdersByStatus(eq(OrderStatus.PENDING), eq(30L), any(PageRequestDto.class)))
+                .thenReturn(new PageResponseDto<>(List.of(pendingOrderResponse()), 2, 5, 11, 3));
+
+        mockMvc.perform(get(URL).principal(authenticatedAs(30L))
+                        .param("status", "PENDING").param("page", "2").param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].clientId").value(7))
+                .andExpect(jsonPath("$.content[0].restaurantId").value(10))
+                .andExpect(jsonPath("$.content[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.content[0].dishes[0].dishId").value(5))
+                .andExpect(jsonPath("$.content[0].dishes[0].quantity").value(2))
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.totalElements").value(11));
+
+        ArgumentCaptor<PageRequestDto> captor = ArgumentCaptor.forClass(PageRequestDto.class);
+        verify(orderHandler).getOrdersByStatus(eq(OrderStatus.PENDING), eq(30L), captor.capture());
+        assertEquals(2, captor.getValue().getPage());
+        assertEquals(5, captor.getValue().getSize());
+    }
+
+    @Test
+    void getOrdersByStatusShouldReturn400WhenStatusIsMissing() throws Exception {
+        mockMvc.perform(get(URL).principal(authenticatedAs(30L)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(orderHandler);
+    }
+
+    @Test
+    void getOrdersByStatusShouldReturn400WhenStatusIsNotValid() throws Exception {
+        mockMvc.perform(get(URL).principal(authenticatedAs(30L)).param("status", "COOKING"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(orderHandler);
+    }
+
+    @Test
+    void getOrdersByStatusShouldReturn400WhenPaginationIsInvalid() throws Exception {
+        when(orderHandler.getOrdersByStatus(eq(OrderStatus.PENDING), eq(30L), any(PageRequestDto.class)))
+                .thenThrow(new InvalidPaginationException(SIZE_INVALID_MESSAGE));
+
+        mockMvc.perform(get(URL).principal(authenticatedAs(30L))
+                        .param("status", "PENDING").param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(SIZE_INVALID_MESSAGE));
+    }
+
+    @Test
+    void getOrdersByStatusShouldReturn403WhenEmployeeIsNotAssignedToARestaurant() throws Exception {
+        when(orderHandler.getOrdersByStatus(eq(OrderStatus.PENDING), eq(30L), any(PageRequestDto.class)))
+                .thenThrow(new EmployeeNotAssignedException(EMPLOYEE_NOT_ASSIGNED_MESSAGE));
+
+        mockMvc.perform(get(URL).principal(authenticatedAs(30L)).param("status", "PENDING"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(EMPLOYEE_NOT_ASSIGNED_MESSAGE));
     }
 }

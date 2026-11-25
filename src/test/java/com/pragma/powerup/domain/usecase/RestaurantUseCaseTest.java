@@ -1,24 +1,33 @@
 package com.pragma.powerup.domain.usecase;
 
+import com.pragma.powerup.domain.exception.EmployeeAlreadyAssignedException;
 import com.pragma.powerup.domain.exception.InvalidPaginationException;
+import com.pragma.powerup.domain.exception.NotRestaurantOwnerException;
+import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
 import com.pragma.powerup.domain.exception.OwnerNotFoundException;
 import com.pragma.powerup.domain.exception.RestaurantAlreadyExistsException;
 import com.pragma.powerup.domain.exception.UserNotOwnerException;
+import com.pragma.powerup.domain.model.EmployeeRestaurantModel;
 import com.pragma.powerup.domain.model.PageModel;
 import com.pragma.powerup.domain.model.RestaurantModel;
 import com.pragma.powerup.domain.model.Role;
+import com.pragma.powerup.domain.spi.IEmployeeRestaurantPersistencePort;
 import com.pragma.powerup.domain.spi.IRestaurantPersistencePort;
 import com.pragma.powerup.domain.spi.IUserClientPort;
 import com.pragma.powerup.domain.validation.PaginationValidator;
 import com.pragma.powerup.domain.validation.RestaurantValidator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
+import static com.pragma.powerup.domain.util.DishConstants.RESTAURANT_NOT_FOUND_MESSAGE;
+import static com.pragma.powerup.domain.util.EmployeeConstants.*;
 import static com.pragma.powerup.domain.util.PaginationConstants.PAGE_INVALID_MESSAGE;
 import static com.pragma.powerup.domain.util.RestaurantConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -38,6 +47,9 @@ class RestaurantUseCaseTest {
 
     @Mock
     private PaginationValidator paginationValidator;
+
+    @Mock
+    private IEmployeeRestaurantPersistencePort employeeRestaurantPersistencePort;
 
     @InjectMocks
     RestaurantUseCase restaurantUseCase;
@@ -133,5 +145,59 @@ class RestaurantUseCaseTest {
 
         assertEquals(PAGE_INVALID_MESSAGE, ex.getMessage());
         verify(restaurantPersistencePort, never()).findAllOrderedByName(anyInt(), anyInt());
+    }
+
+    private void givenRestaurantOwnedBy(Long ownerId) {
+        RestaurantModel restaurant = validRestaurant();
+        restaurant.setId(10L);
+        restaurant.setOwnerId(ownerId);
+        when(restaurantPersistencePort.findById(10L)).thenReturn(Optional.of(restaurant));
+    }
+
+    @Test
+    void assignEmployeeShouldSaveTheLinkWhenEverythingIsValid() {
+        givenRestaurantOwnedBy(1L);
+        when(employeeRestaurantPersistencePort.existsByEmployeeId(30L)).thenReturn(false);
+
+        restaurantUseCase.assignEmployee(10L, 30L, 1L);
+
+        ArgumentCaptor<EmployeeRestaurantModel> captor = ArgumentCaptor.forClass(EmployeeRestaurantModel.class);
+        verify(employeeRestaurantPersistencePort).saveEmployeeRestaurant(captor.capture());
+        assertEquals(30L, captor.getValue().getEmployeeId());
+        assertEquals(10L, captor.getValue().getRestaurantId());
+    }
+
+    @Test
+    void assignEmployeeShouldThrowWhenRestaurantDoesNotExist() {
+        when(restaurantPersistencePort.findById(10L)).thenReturn(Optional.empty());
+
+        RestaurantNotFoundException ex = assertThrows(RestaurantNotFoundException.class,
+                () -> restaurantUseCase.assignEmployee(10L, 30L, 1L));
+
+        assertEquals(RESTAURANT_NOT_FOUND_MESSAGE, ex.getMessage());
+        verifyNoInteractions(userClientPort, employeeRestaurantPersistencePort);
+    }
+
+    @Test
+    void assignEmployeeShouldThrowWhenRequesterIsNotTheOwner() {
+        givenRestaurantOwnedBy(1L);
+
+        NotRestaurantOwnerException ex = assertThrows(NotRestaurantOwnerException.class,
+                () -> restaurantUseCase.assignEmployee(10L, 30L, 2L));
+
+        assertEquals(NOT_RESTAURANT_OWNER_EMPLOYEE_MESSAGE, ex.getMessage());
+        verifyNoInteractions(userClientPort, employeeRestaurantPersistencePort);
+    }
+
+    @Test
+    void assignEmployeeShouldThrowWhenEmployeeIsAlreadyAssigned() {
+        givenRestaurantOwnedBy(1L);
+        when(employeeRestaurantPersistencePort.existsByEmployeeId(30L)).thenReturn(true);
+
+        EmployeeAlreadyAssignedException ex = assertThrows(EmployeeAlreadyAssignedException.class,
+                () -> restaurantUseCase.assignEmployee(10L, 30L, 1L));
+
+        assertEquals(EMPLOYEE_ALREADY_ASSIGNED_MESSAGE, ex.getMessage());
+        verify(employeeRestaurantPersistencePort, never()).saveEmployeeRestaurant(any());
     }
 }

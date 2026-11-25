@@ -2,20 +2,30 @@ package com.pragma.powerup.infrastructure.out.jpa.adapter;
 
 import com.pragma.powerup.domain.model.OrderModel;
 import com.pragma.powerup.domain.model.OrderStatus;
+import com.pragma.powerup.domain.model.PageModel;
 import com.pragma.powerup.infrastructure.out.jpa.entity.OrderEntity;
 import com.pragma.powerup.infrastructure.out.jpa.mapper.IOrderEntityMapper;
 import com.pragma.powerup.infrastructure.out.jpa.repository.IOrderRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,5 +70,26 @@ class OrderJpaAdapterTest {
         when(orderRepository.existsByClientIdAndStatusIn(7L, statuses)).thenReturn(false);
 
         assertFalse(orderJpaAdapter.existsByClientIdAndStatusIn(7L, statuses));
+    }
+
+    @Test
+    void findByRestaurantIdAndStatusShouldPageByDateAscendingAndMapToPageModel() {
+        OrderEntity entity = new OrderEntity();
+        OrderModel model = new OrderModel();
+        Pageable pageable = PageRequest.of(1, 2, Sort.by("date").ascending());
+        when(orderRepository.findByRestaurant_IdAndStatus(eq(10L), eq(OrderStatus.PENDING), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(entity), pageable, 5));
+        when(orderEntityMapper.toOrderModel(entity)).thenReturn(model);
+
+        PageModel<OrderModel> result = orderJpaAdapter.findByRestaurantIdAndStatus(10L, OrderStatus.PENDING, 1, 2);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(orderRepository).findByRestaurant_IdAndStatus(eq(10L), eq(OrderStatus.PENDING), captor.capture());
+        assertEquals(pageable, captor.getValue());
+        assertEquals(List.of(model), result.getContent());
+        assertEquals(1, result.getPage());
+        assertEquals(2, result.getSize());
+        assertEquals(5, result.getTotalElements());
+        assertEquals(3, result.getTotalPages());
     }
 }

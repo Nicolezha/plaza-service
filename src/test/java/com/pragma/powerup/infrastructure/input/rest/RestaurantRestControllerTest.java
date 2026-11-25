@@ -1,11 +1,14 @@
 package com.pragma.powerup.infrastructure.input.rest;
 
+import com.pragma.powerup.application.dto.request.EmployeeAssignmentRequestDto;
 import com.pragma.powerup.application.dto.request.PageRequestDto;
 import com.pragma.powerup.application.dto.request.RestaurantRequestDto;
 import com.pragma.powerup.application.dto.response.PageResponseDto;
 import com.pragma.powerup.application.dto.response.RestaurantListResponseDto;
 import com.pragma.powerup.application.handler.IRestaurantHandler;
+import com.pragma.powerup.domain.exception.EmployeeAlreadyAssignedException;
 import com.pragma.powerup.domain.exception.InvalidPaginationException;
+import com.pragma.powerup.domain.exception.NotRestaurantOwnerException;
 import com.pragma.powerup.domain.exception.OwnerNotFoundException;
 import com.pragma.powerup.domain.exception.RestaurantAlreadyExistsException;
 import com.pragma.powerup.domain.exception.UserNotOwnerException;
@@ -19,15 +22,20 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 
+import static com.pragma.powerup.domain.util.EmployeeConstants.*;
 import static com.pragma.powerup.domain.util.PaginationConstants.SIZE_INVALID_MESSAGE;
 import static com.pragma.powerup.domain.util.RestaurantConstants.*;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -183,5 +191,58 @@ class RestaurantRestControllerTest {
         mockMvc.perform(get(URL).param("size", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(SIZE_INVALID_MESSAGE));
+    }
+
+    private static final String EMPLOYEE_URL = URL + "/10/employee";
+    private static final String EMPLOYEE_BODY = "{\"employeeId\": 30}";
+
+    private Authentication ownerAuthentication() {
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                "owner@gmail.com", null, List.of(new SimpleGrantedAuthority("ROLE_OWNER")));
+        authentication.setDetails(1L);
+        return authentication;
+    }
+
+    @Test
+    void assignEmployeeShouldReturn201AndPassRestaurantBodyAndRequester() throws Exception {
+        mockMvc.perform(post(EMPLOYEE_URL).principal(ownerAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON).content(EMPLOYEE_BODY))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<EmployeeAssignmentRequestDto> captor = ArgumentCaptor.forClass(EmployeeAssignmentRequestDto.class);
+        verify(restaurantHandler).assignEmployee(eq(10L), captor.capture(), eq(1L));
+        assertEquals(30L, captor.getValue().getEmployeeId());
+    }
+
+    @Test
+    void assignEmployeeShouldReturn400WhenEmployeeIdIsMissing() throws Exception {
+        mockMvc.perform(post(EMPLOYEE_URL).principal(ownerAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("employeeId")));
+
+        verifyNoInteractions(restaurantHandler);
+    }
+
+    @Test
+    void assignEmployeeShouldReturn403WhenRequesterIsNotTheOwner() throws Exception {
+        doThrow(new NotRestaurantOwnerException(NOT_RESTAURANT_OWNER_EMPLOYEE_MESSAGE))
+                .when(restaurantHandler).assignEmployee(eq(10L), any(EmployeeAssignmentRequestDto.class), eq(1L));
+
+        mockMvc.perform(post(EMPLOYEE_URL).principal(ownerAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON).content(EMPLOYEE_BODY))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(NOT_RESTAURANT_OWNER_EMPLOYEE_MESSAGE));
+    }
+
+    @Test
+    void assignEmployeeShouldReturn409WhenEmployeeIsAlreadyAssigned() throws Exception {
+        doThrow(new EmployeeAlreadyAssignedException(EMPLOYEE_ALREADY_ASSIGNED_MESSAGE))
+                .when(restaurantHandler).assignEmployee(eq(10L), any(EmployeeAssignmentRequestDto.class), eq(1L));
+
+        mockMvc.perform(post(EMPLOYEE_URL).principal(ownerAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON).content(EMPLOYEE_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(EMPLOYEE_ALREADY_ASSIGNED_MESSAGE));
     }
 }
