@@ -22,4 +22,7 @@ public class OrderConstants {
 
     public static final String DISH_NOT_AVAILABLE_MESSAGE =
             "The order contains a dish that is not available";
+
+    public static final String STATUS_REQUIRED_MESSAGE =
+            "The order status is required";
 }

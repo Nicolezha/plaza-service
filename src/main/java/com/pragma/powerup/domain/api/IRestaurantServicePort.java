@@ -8,4 +8,6 @@ public interface IRestaurantServicePort {
     PageModel<RestaurantModel> getRestaurants(int page, int size);
 
     void saveRestaurant(RestaurantModel restaurantModel);
+
+    void assignEmployee(Long restaurantId, Long employeeId, Long requesterId);
 }

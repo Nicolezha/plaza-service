@@ -113,4 +113,16 @@ public class ControllerAdvisor {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
     }
+
+    @ExceptionHandler(EmployeeAlreadyAssignedException.class)
+    public ResponseEntity<Map<String, String>> handleEmployeeAlreadyAssigned(EmployeeAlreadyAssignedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
+
+    @ExceptionHandler(EmployeeNotAssignedException.class)
+    public ResponseEntity<Map<String, String>> handleEmployeeNotAssigned(EmployeeNotAssignedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
 }

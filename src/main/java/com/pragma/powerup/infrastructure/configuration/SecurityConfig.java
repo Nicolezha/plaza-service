@@ -30,10 +30,12 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/restaurant").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/restaurant").hasRole("CLIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/restaurant/*/employee").hasRole("OWNER")
                         .requestMatchers(HttpMethod.POST, "/api/v1/dish").hasRole("OWNER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/dish/**").hasRole("OWNER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/dish").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.POST, "/api/v1/order").hasRole("CLIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/order").hasRole("EMPLOYEE")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))

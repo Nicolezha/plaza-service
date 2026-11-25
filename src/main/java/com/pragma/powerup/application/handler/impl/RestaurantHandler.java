@@ -1,5 +1,6 @@
 package com.pragma.powerup.application.handler.impl;
 
+import com.pragma.powerup.application.dto.request.EmployeeAssignmentRequestDto;
 import com.pragma.powerup.application.dto.request.PageRequestDto;
 import com.pragma.powerup.application.dto.request.RestaurantRequestDto;
 import com.pragma.powerup.application.dto.response.PageResponseDto;
@@ -45,4 +46,10 @@ public class RestaurantHandler implements IRestaurantHandler {
                 pageModel.getTotalElements(), pageModel.getTotalPages());
     }
 
+    @Override
+    public void assignEmployee(Long restaurantId, EmployeeAssignmentRequestDto employeeAssignmentRequestDto,
+                               Long requesterId) {
+        restaurantServicePort.assignEmployee(restaurantId,
+                employeeAssignmentRequestDto.getEmployeeId(), requesterId);
+    }
 }
