@@ -1,5 +1,8 @@
 package com.pragma.powerup.domain.usecase;
 
+import com.pragma.powerup.domain.exception.InvalidOrderStatusException;
+import com.pragma.powerup.domain.exception.OrderNotFoundException;
+import com.pragma.powerup.domain.exception.OrderNotFromRestaurantException;
 import com.pragma.powerup.domain.exception.DishNotFoundException;
 import com.pragma.powerup.domain.exception.EmployeeNotAssignedException;
 import com.pragma.powerup.domain.exception.InvalidPaginationException;
@@ -254,5 +257,87 @@ class OrderUseCaseTest {
 
         assertEquals(EMPLOYEE_NOT_ASSIGNED_MESSAGE, ex.getMessage());
         verifyNoInteractions(orderPersistencePort);
+    }
+
+    private static final Long ORDER_ID = 100L;
+
+    private OrderModel storedOrder(Long restaurantId, OrderStatus status) {
+        OrderModel order = new OrderModel();
+        order.setId(ORDER_ID);
+        order.setRestaurantId(restaurantId);
+        order.setStatus(status);
+        return order;
+    }
+
+    private void givenEmployeeOfRestaurant() {
+        when(employeeRestaurantPersistencePort.findRestaurantIdByEmployeeId(EMPLOYEE_ID))
+                .thenReturn(Optional.of(RESTAURANT_ID));
+    }
+
+    @Test
+    void assignOrderShouldSetEmployeeAndInPreparationWhenOrderIsPending() {
+        OrderModel order = storedOrder(RESTAURANT_ID, OrderStatus.PENDING);
+        givenEmployeeOfRestaurant();
+        when(orderPersistencePort.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderPersistencePort.updateOrder(order)).thenReturn(order);
+
+        OrderModel result = orderUseCase.assignOrder(ORDER_ID, EMPLOYEE_ID);
+
+        assertSame(order, result);
+        assertEquals(EMPLOYEE_ID, result.getEmployeeId());
+        assertEquals(OrderStatus.IN_PREPARATION, result.getStatus());
+        verify(orderPersistencePort).updateOrder(order);
+    }
+
+    @Test
+    void assignOrderShouldThrowWhenEmployeeIsNotAssignedToARestaurant() {
+        when(employeeRestaurantPersistencePort.findRestaurantIdByEmployeeId(EMPLOYEE_ID))
+                .thenReturn(Optional.empty());
+
+        EmployeeNotAssignedException ex = assertThrows(EmployeeNotAssignedException.class,
+                () -> orderUseCase.assignOrder(ORDER_ID, EMPLOYEE_ID));
+
+        assertEquals(EMPLOYEE_NOT_ASSIGNED_MESSAGE, ex.getMessage());
+        verifyNoInteractions(orderPersistencePort);
+    }
+
+    @Test
+    void assignOrderShouldThrowWhenOrderDoesNotExist() {
+        givenEmployeeOfRestaurant();
+        when(orderPersistencePort.findById(ORDER_ID)).thenReturn(Optional.empty());
+
+        OrderNotFoundException ex = assertThrows(OrderNotFoundException.class,
+                () -> orderUseCase.assignOrder(ORDER_ID, EMPLOYEE_ID));
+
+        assertEquals(ORDER_NOT_FOUND_MESSAGE, ex.getMessage());
+        verify(orderPersistencePort, never()).updateOrder(any());
+    }
+
+    @Test
+    void assignOrderShouldThrowWhenOrderBelongsToAnotherRestaurant() {
+        givenEmployeeOfRestaurant();
+        when(orderPersistencePort.findById(ORDER_ID))
+                .thenReturn(Optional.of(storedOrder(OTHER_RESTAURANT_ID, OrderStatus.PENDING)));
+
+        OrderNotFromRestaurantException ex = assertThrows(OrderNotFromRestaurantException.class,
+                () -> orderUseCase.assignOrder(ORDER_ID, EMPLOYEE_ID));
+
+        assertEquals(ORDER_NOT_FROM_EMPLOYEE_RESTAURANT_MESSAGE, ex.getMessage());
+        verify(orderPersistencePort, never()).updateOrder(any());
+    }
+
+    @Test
+    void assignOrderShouldThrowWhenOrderIsNotPending() {
+        OrderModel order = storedOrder(RESTAURANT_ID, OrderStatus.IN_PREPARATION);
+        order.setEmployeeId(99L);
+        givenEmployeeOfRestaurant();
+        when(orderPersistencePort.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        InvalidOrderStatusException ex = assertThrows(InvalidOrderStatusException.class,
+                () -> orderUseCase.assignOrder(ORDER_ID, EMPLOYEE_ID));
+
+        assertEquals(ORDER_NOT_PENDING_MESSAGE, ex.getMessage());
+        assertEquals(99L, order.getEmployeeId());
+        verify(orderPersistencePort, never()).updateOrder(any());
     }
 }

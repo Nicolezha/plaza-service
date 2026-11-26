@@ -1,5 +1,6 @@
 package com.pragma.powerup.application.handler.impl;
 
+
 import com.pragma.powerup.application.dto.request.OrderRequestDto;
 import com.pragma.powerup.application.dto.request.PageRequestDto;
 import com.pragma.powerup.application.dto.response.OrderResponseDto;
@@ -67,5 +68,17 @@ class OrderHandlerTest {
         assertEquals(5, result.getSize());
         assertEquals(6, result.getTotalElements());
         assertEquals(2, result.getTotalPages());
+    }
+
+    @Test
+    void assignOrderShouldDelegateAndMapTheResult() {
+        OrderModel model = new OrderModel();
+        OrderResponseDto response = new OrderResponseDto();
+        when(orderServicePort.assignOrder(100L, 30L)).thenReturn(model);
+        when(orderResponseMapper.toResponse(model)).thenReturn(response);
+
+        OrderResponseDto result = orderHandler.assignOrder(100L, 30L);
+
+        assertEquals(response, result);
     }
 }

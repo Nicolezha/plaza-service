@@ -1,5 +1,9 @@
 package com.pragma.powerup.infrastructure.input.rest;
 
+import com.pragma.powerup.domain.exception.InvalidOrderStatusException;
+import com.pragma.powerup.domain.exception.OrderNotFoundException;
+import com.pragma.powerup.domain.exception.OrderNotFromRestaurantException;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import com.pragma.powerup.application.dto.request.OrderRequestDto;
 import com.pragma.powerup.application.dto.request.PageRequestDto;
 import com.pragma.powerup.application.dto.response.OrderDishResponseDto;
@@ -252,5 +256,49 @@ class OrderRestControllerTest {
         mockMvc.perform(get(URL).principal(authenticatedAs(30L)).param("status", "PENDING"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(EMPLOYEE_NOT_ASSIGNED_MESSAGE));
+    }
+
+    private static final String ASSIGN_URL = "/api/v1/order/100/assign";
+
+    @Test
+    void assignOrderShouldReturn200WithTheAssignedOrder() throws Exception {
+        OrderResponseDto response = new OrderResponseDto();
+        response.setId(100L);
+        response.setStatus(OrderStatus.IN_PREPARATION);
+        response.setEmployeeId(30L);
+        when(orderHandler.assignOrder(100L, 30L)).thenReturn(response);
+
+        mockMvc.perform(patch(ASSIGN_URL).principal(authenticatedAs(30L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(100))
+                .andExpect(jsonPath("$.status").value("IN_PREPARATION"))
+                .andExpect(jsonPath("$.employeeId").value(30));
+    }
+
+    @Test
+    void assignOrderShouldReturn404WhenOrderDoesNotExist() throws Exception {
+        when(orderHandler.assignOrder(100L, 30L)).thenThrow(new OrderNotFoundException("not found"));
+
+        mockMvc.perform(patch(ASSIGN_URL).principal(authenticatedAs(30L)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("not found"));
+    }
+
+    @Test
+    void assignOrderShouldReturn403WhenOrderIsFromAnotherRestaurant() throws Exception {
+        when(orderHandler.assignOrder(100L, 30L)).thenThrow(new OrderNotFromRestaurantException("other"));
+
+        mockMvc.perform(patch(ASSIGN_URL).principal(authenticatedAs(30L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("other"));
+    }
+
+    @Test
+    void assignOrderShouldReturn409WhenOrderIsNotPending() throws Exception {
+        when(orderHandler.assignOrder(100L, 30L)).thenThrow(new InvalidOrderStatusException("not pending"));
+
+        mockMvc.perform(patch(ASSIGN_URL).principal(authenticatedAs(30L)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("not pending"));
     }
 }
