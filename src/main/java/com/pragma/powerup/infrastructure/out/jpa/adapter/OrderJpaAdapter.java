@@ -4,6 +4,7 @@ import com.pragma.powerup.domain.model.OrderModel;
 import com.pragma.powerup.domain.model.OrderStatus;
 import com.pragma.powerup.domain.model.PageModel;
 import com.pragma.powerup.domain.spi.IOrderPersistencePort;
+import com.pragma.powerup.infrastructure.exception.NoDataFoundException;
 import com.pragma.powerup.infrastructure.out.jpa.entity.OrderEntity;
 import com.pragma.powerup.infrastructure.out.jpa.mapper.IOrderEntityMapper;
 import com.pragma.powerup.infrastructure.out.jpa.repository.IOrderRepository;
@@ -14,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 public class OrderJpaAdapter implements IOrderPersistencePort {
@@ -44,5 +46,21 @@ public class OrderJpaAdapter implements IOrderPersistencePort {
 
         return new PageModel<>(content, result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());
+    }
+
+    @Override
+    public Optional<OrderModel> findById(Long orderId) {
+        return orderRepository.findById(orderId).map(orderEntityMapper::toOrderModel);
+    }
+
+    @Override
+    public OrderModel updateOrder(OrderModel order) {
+        OrderEntity orderEntity = orderRepository.findById(order.getId())
+                .orElseThrow(NoDataFoundException::new);
+
+        orderEntity.setStatus(order.getStatus());
+        orderEntity.setEmployeeId(order.getEmployeeId());
+
+        return orderEntityMapper.toOrderModel(orderRepository.save(orderEntity));
     }
 }

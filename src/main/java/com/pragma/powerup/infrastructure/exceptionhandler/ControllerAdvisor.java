@@ -120,6 +120,24 @@ public class ControllerAdvisor {
                 .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
     }
 
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleOrderNotFound(OrderNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
+
+    @ExceptionHandler(OrderNotFromRestaurantException.class)
+    public ResponseEntity<Map<String, String>> handleOrderNotFromRestaurant(OrderNotFromRestaurantException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidOrderStatusException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidOrderStatus(InvalidOrderStatusException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Collections.singletonMap(MESSAGE, ex.getMessage()));
+    }
+
     @ExceptionHandler(EmployeeNotAssignedException.class)
     public ResponseEntity<Map<String, String>> handleEmployeeNotAssigned(EmployeeNotAssignedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

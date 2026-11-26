@@ -25,4 +25,13 @@ public class OrderConstants {
 
     public static final String STATUS_REQUIRED_MESSAGE =
             "The order status is required";
+
+    public static final String ORDER_NOT_FOUND_MESSAGE =
+            "The order does not exist";
+
+    public static final String ORDER_NOT_FROM_EMPLOYEE_RESTAURANT_MESSAGE =
+            "The order does not belong to the restaurant of the employee";
+
+    public static final String ORDER_NOT_PENDING_MESSAGE =
+            "Only pending orders can be assigned";
 }

@@ -4,7 +4,10 @@ import com.pragma.powerup.domain.api.IOrderServicePort;
 import com.pragma.powerup.domain.exception.DishNotFoundException;
 import com.pragma.powerup.domain.exception.EmployeeNotAssignedException;
 import com.pragma.powerup.domain.exception.InvalidOrderDataException;
+import com.pragma.powerup.domain.exception.InvalidOrderStatusException;
 import com.pragma.powerup.domain.exception.OrderInProgressException;
+import com.pragma.powerup.domain.exception.OrderNotFoundException;
+import com.pragma.powerup.domain.exception.OrderNotFromRestaurantException;
 import com.pragma.powerup.domain.exception.RestaurantNotFoundException;
 import com.pragma.powerup.domain.model.DishModel;
 import com.pragma.powerup.domain.model.OrderDishModel;
@@ -80,10 +83,35 @@ public class OrderUseCase implements IOrderServicePort {
             throw new InvalidOrderDataException(STATUS_REQUIRED_MESSAGE);
         }
 
-        Long restaurantId = employeeRestaurantPersistencePort.findRestaurantIdByEmployeeId(employeeId)
-                .orElseThrow(() -> new EmployeeNotAssignedException(EMPLOYEE_NOT_ASSIGNED_MESSAGE));
+        Long restaurantId = findEmployeeRestaurantId(employeeId);
 
         return orderPersistencePort.findByRestaurantIdAndStatus(restaurantId, status, page, size);
+    }
+
+    @Override
+    public OrderModel assignOrder(Long orderId, Long employeeId) {
+        Long restaurantId = findEmployeeRestaurantId(employeeId);
+
+        OrderModel order = orderPersistencePort.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
+
+        if (!restaurantId.equals(order.getRestaurantId())) {
+            throw new OrderNotFromRestaurantException(ORDER_NOT_FROM_EMPLOYEE_RESTAURANT_MESSAGE);
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new InvalidOrderStatusException(ORDER_NOT_PENDING_MESSAGE);
+        }
+
+        order.setEmployeeId(employeeId);
+        order.setStatus(OrderStatus.IN_PREPARATION);
+
+        return orderPersistencePort.updateOrder(order);
+    }
+
+    private Long findEmployeeRestaurantId(Long employeeId) {
+        return employeeRestaurantPersistencePort.findRestaurantIdByEmployeeId(employeeId)
+                .orElseThrow(() -> new EmployeeNotAssignedException(EMPLOYEE_NOT_ASSIGNED_MESSAGE));
     }
 
     private void validateDishBelongsToRestaurant(Long dishId, Long restaurantId) {

@@ -17,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -59,5 +61,19 @@ public class OrderRestController {
             Authentication authentication) {
         Long employeeId = (Long) authentication.getDetails();
         return ResponseEntity.ok(orderHandler.getOrdersByStatus(status, employeeId, pageRequest));
+    }
+
+    @Operation(summary = "Assign the order to the authenticated employee and set it IN_PREPARATION")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Order assigned and in preparation"),
+            @ApiResponse(responseCode = "403", description = "Employee without restaurant or order from another restaurant", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Order not found", content = @Content),
+            @ApiResponse(responseCode = "409", description = "The order is not pending", content = @Content)
+    })
+    @PatchMapping("/{orderId}/assign")
+    public ResponseEntity<OrderResponseDto> assignOrder(@PathVariable Long orderId,
+                                                        Authentication authentication) {
+        Long employeeId = (Long) authentication.getDetails();
+        return ResponseEntity.ok(orderHandler.assignOrder(orderId, employeeId));
     }
 }

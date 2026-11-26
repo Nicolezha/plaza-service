@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/dish").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.POST, "/api/v1/order").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/v1/order").hasRole("EMPLOYEE")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/order/*/assign").hasRole("EMPLOYEE")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
